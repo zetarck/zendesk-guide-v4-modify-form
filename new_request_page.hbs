@@ -1,0 +1,146 @@
+<div class="container-divider"></div>
+<div class="container">
+    <div class="sub-nav">
+        {{breadcrumbs}}
+        <div class="search-container">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" focusable="false" viewBox="0 0 12 12"
+                class="search-icon" aria-hidden="true">
+                <circle cx="4.5" cy="4.5" r="4" fill="none" stroke="currentColor" />
+                <path stroke="currentColor" stroke-linecap="round" d="M11 11L7.5 7.5" />
+            </svg>
+            {{search submit=false}}
+        </div>
+    </div>
+
+    <h1>
+        {{t 'submit_a_request'}}
+    </h1>
+
+    <div id="main-content" class="form">
+        <div id="new-request-form"></div>
+    </div>
+</div>
+
+<script type="module">
+    //Created by Pablo Zarricueta. ZerviZ CX Consultant.
+    //https://developer.zendesk.com/api-reference/help_center/help-center-templates/new_request_page/
+    import { renderNewRequestForm } from "new-request-form";
+    //Mandatory elements prior rendering
+    const container = document.getElementById("new-request-form");
+    //The settings object has custom properties. The object maps the identifier and value of the variables defined in the theme's manifest.json file. 
+    //https://support.zendesk.com/hc/en-us/articles/4408846524954-Customizing-the-Settings-panel-of-the-theme#understanding-the-manifest-json-file
+    const settings = {{ json settings }};
+    //Object containing information about the new request form: ticket form field, organization field, attachments, etc.
+    let request_form_clone = { ...{{ json new_request_form }}};
+
+    //get current user data: user and org tags
+    const orgs = window.HelpCenter.user.organizations;
+    const userTags = window.HelpCenter.user.tags;
+
+    // Flatten the array of organizations to get only the tags
+    const orgTags = orgs.flatMap(org => org.tags);
+
+    //for testing and debugging.
+    console.log(userTags);
+    console.log(orgs);
+    console.log(request_form_clone);
+    console.log(request_form_clone.ticket_form_field.value);
+
+    //Set your own ticket field Id. You can use any custom ticket field here.
+    const tipo_caso_field_id = '46560480244884';
+
+
+    //Use Case 1: Hide a ticket field dropdown option based on user tag.
+    //This is an object.
+    const remove_options_by_tag = {
+        'user_tag': {
+            fieldId: tipo_caso_field_id,          // Ticket Field ID
+            options: ['Duda']  // Dropdown Value to remove
+        }
+    };
+
+    function applyTagBasedOptionFilter(request_form_clone, userTags, rulesByTag) {
+        request_form_clone.ticket_fields.forEach(field => {
+            // Only custom ticket fields
+            if (!field.name.includes("request[custom_fields]")) return;
+            // Extract field ID: request[custom_fields][44252325027604] → "44252325027604"
+            const match = field.name.match(/\[(\d+)\]$/);
+            if (!match) return;
+            const fieldId = match[1];
+            // Apply rules to the user
+            Object.keys(rulesByTag).forEach(tag => {
+                if (!userTags.includes(tag)) return; // The user does not have this tag → skip
+                const rules = Array.isArray(rulesByTag[tag]) ? rulesByTag[tag] : [rulesByTag[tag]];
+                rules.forEach(rule => {
+                    if (rule.fieldId !== fieldId) return; // This rule does not apply to this field → skip
+                    // Remove the forbidden options from the dropdown
+                    field.options = field.options.filter(opt => !rule.options.includes(opt.name));
+                });
+            });
+        });
+        return request_form_clone;
+    }
+
+
+
+    //Use Case 2: Change subject text based on a specific ticket form Id
+    // Map of ticket_form_id → subject text to display
+    const subjectTextByFormId = {
+        '46560545585812': 'Estas en el formulario de Demo Plantilla',
+    };
+
+    function applySubjectTextChange(request_form_clone, subjectTextByFormId) {
+        // ticket_form_field is an object (not an array), read its current value directly
+        const currentFormId = String(request_form_clone.ticket_form_field.value);
+        const newSubject = subjectTextByFormId[currentFormId];
+
+        if (newSubject) {
+            // Find the subject field inside ticket_fields and update its value
+            request_form_clone.ticket_fields = request_form_clone.ticket_fields.map(field => {
+                if (field.name === 'request[subject]') {
+                    return { ...field, value: newSubject };
+                }
+                return field;
+            });
+        }
+
+        return request_form_clone;
+    }
+
+
+
+
+    //Call to function
+    request_form_clone = applyTagBasedOptionFilter(request_form_clone, userTags, remove_options_by_tag);
+    request_form_clone = applySubjectTextChange(request_form_clone, subjectTextByFormId);
+
+    //--------------------
+    //Render the form
+    //-------------------
+    const props = {
+        requestForm: request_form_clone, // Use form Clone
+        newRequestPath: {{ json (page_path 'new_request')}},
+    parentId: { {json parent.id } },
+    parentIdPath: { {json parent.url } },
+    locale: { {json help_center.locale } },
+    baseLocale: { {json help_center.base_locale } },
+    hasAtMentions: { {json help_center.at_mentions_enabled } },
+    userRole: { {json user.role } },
+    userId: { {json user.id } },
+    brandId: { {json brand.id } },
+    organizations: { {json user.organizations } },
+    wysiwyg: true,
+        answerBotModal: {
+        answerBot: { {json answer_bot } },
+        hasRequestManagement: { {json help_center.request_management_enabled } },
+        isSignedIn: { {json signed_in } },
+        helpCenterPath: { { json(page_path 'help_center') } },
+        requestsPath: { { json(page_path 'requests') } },
+        requestPath: { { json(page_path 'request' id = answer_bot.request_id) } }
+    },
+};
+
+    renderNewRequestForm(settings, props, container);
+
+
+</script>
