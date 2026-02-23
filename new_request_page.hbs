@@ -47,16 +47,20 @@
     console.log(request_form_clone.ticket_form_field.value);
 
     //Set your own ticket field Id. You can use any custom ticket field here.
-    const tipo_caso_field_id = '46560480244884';
-
+    const tipo_caso_field_id = '46560480244884'; //first dropdown field
+    const tipo_solicitud_field_id = '39445201654164'; //second dropdown field
 
     //Use Case 1: Hide a ticket field dropdown option based on user tag.
     //This is an object.
     const remove_options_by_tag = {
         'user_tag': {
             fieldId: tipo_caso_field_id,          // Ticket Field ID
-            options: ['Duda']  // Dropdown Value to remove
-        }
+            options: ['Duda']  // Dropdown Value to remove. Add multiple options if wanted
+        }/*, If wanted, you can remove more options from different ticket fields based on user tags.
+        'user_tag': {
+            fieldId: tipo_solicitud_field_id,          
+            options: ['Acceso a cuenta']  
+        }*/
     };
 
     function applyTagBasedOptionFilter(request_form_clone, userTags, rulesByTag) {
@@ -81,12 +85,10 @@
         return request_form_clone;
     }
 
-
-
     //Use Case 2: Change subject text based on a specific ticket form Id
     // Map of ticket_form_id → subject text to display
     const subjectTextByFormId = {
-        '46560545585812': 'Estas en el formulario de Demo Plantilla',
+        '46560545585812': 'Demo Custom text',
     };
 
     function applySubjectTextChange(request_form_clone, subjectTextByFormId) {
@@ -106,9 +108,6 @@
 
         return request_form_clone;
     }
-
-
-
 
     //Call to function
     request_form_clone = applyTagBasedOptionFilter(request_form_clone, userTags, remove_options_by_tag);
