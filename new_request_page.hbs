@@ -109,6 +109,8 @@
         return request_form_clone;
     }
 
+
+
     //Call to function
     request_form_clone = applyTagBasedOptionFilter(request_form_clone, userTags, remove_options_by_tag);
     request_form_clone = applySubjectTextChange(request_form_clone, subjectTextByFormId);
@@ -140,6 +142,32 @@
 };
 
     renderNewRequestForm(settings, props, container);
+
+    //Use Case 3: Hide the ticket form selector (ticket_form_field) from the DOM.
+    //This field is not part of ticket_fields, so it must be hidden via DOM after render.
+    const formSelectorObserver = new MutationObserver((mutations, obs) => {
+        const formSelectorField = container.querySelector('[data-garden-id="dropdowns.combobox.field"]');
+        if (formSelectorField) {
+            formSelectorField.style.display = 'none';
+            obs.disconnect();
+        }
+    });
+    formSelectorObserver.observe(container, { childList: true, subtree: true });
+
+    //Use Case 4: Hide a custom ticket field from the DOM.
+    //Custom fields render a hidden input with name="request[custom_fields][FIELD_ID]".
+    //We find that input in the DOM and hide its closest field wrapper.
+    const customFieldObserver = new MutationObserver((mutations, obs) => {
+        const fieldInput = container.querySelector(
+            `input[name="request[custom_fields][${tipo_solicitud_field_id}]"]`
+        );
+        if (fieldInput) {
+            const fieldWrapper = fieldInput.closest('[data-garden-id="dropdowns.combobox.field"]');
+            if (fieldWrapper) fieldWrapper.style.display = 'none';
+            obs.disconnect();
+        }
+    });
+    customFieldObserver.observe(container, { childList: true, subtree: true });
 
 
 </script>
