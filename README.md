@@ -13,8 +13,9 @@ This Handlebars (`.hbs`) template replaces the default Zendesk new request page.
 1. **Tag-Based Dropdown Filtering** — Hides specific dropdown options from ticket fields based on the current user's tags.
 2. **Form-Specific Subject Text** — Pre-fills the subject field with custom text depending on which ticket form is active.
 3. **Hide form selector**
-4. **Hide specific ticket custom fields**
-5. More uses cases are coming.
+4. **Hide specific ticket custom field**
+5. **Change custom field description**
+6. More uses cases are coming.
 
 
 ---
