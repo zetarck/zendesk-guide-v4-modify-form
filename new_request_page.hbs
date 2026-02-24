@@ -49,8 +49,9 @@
     //Set your own ticket field Id. You can use any custom ticket field here.
     const tipo_caso_field_id = '46560480244884'; //first dropdown field
     const tipo_solicitud_field_id = '39445201654164'; //second dropdown field
+    const numero_orden_field_id = '39445254638612'; //text field
 
-    //Use Case 1: Hide a ticket field dropdown option based on user tag.
+    //Hide a ticket field dropdown option based on user tag.
     //This is an object.
     const remove_options_by_tag = {
         'user_tag': {
@@ -85,7 +86,7 @@
         return request_form_clone;
     }
 
-    //Use Case 2: Change subject text based on a specific ticket form Id
+    //Change subject text based on a specific ticket form Id
     // Map of ticket_form_id → subject text to display
     const subjectTextByFormId = {
         '46560545585812': 'Demo Custom text',
@@ -110,10 +111,10 @@
     }
 
 
-    //Use Case 3: Change the description of a specific custom field by its field ID.
+    //Change the description of a specific custom field by its field ID.
     //The 'description' property is the hint/helper text shown below a field in the form.
     const customFieldDescriptionById = {
-        '46560480244884': 'prueba',  // field ID → new description text
+        '46560480244884': 'Description set by code',  // field ID → new description text
     };
 
     function applyCustomFieldDescriptionById(request_form_clone, descriptionMap) {
@@ -132,10 +133,58 @@
     }
 
 
+    const customFieldTextValue = {
+        //field ID → text value to display
+        '39445254638612': 'Custom text value',
+        // more values can be added here
+    };
+
+    //Set text value to one or more custom fields by their field ID.
+    function applyCustomFieldTextValue(request_form_clone, textValueMap) {
+        request_form_clone.ticket_fields = request_form_clone.ticket_fields.map(field => {
+            // Only custom ticket fields have names like request[custom_fields][ID]
+            const match = field.name && field.name.match(/\[(\d+)\]$/);
+            if (!match) return field;
+
+            const fieldId = match[1];
+            if (textValueMap[fieldId] !== undefined) {
+                return { ...field, value: textValueMap[fieldId] };
+            }
+            return field;
+        });
+        return request_form_clone;
+    }
+
+    const customFieldDropdownValue = {
+        //field ID → dropdown value to display
+        '46560480244884': 'demo_reclamo',
+        '39445201654164': 'acceso_a_cuenta',
+        // more values can be added here
+    };
+
+    //Set dropdown value to one or more custom fields by their field ID.
+    function applyCustomFieldDropdownValue(request_form_clone, dropdownValueMap) {
+        request_form_clone.ticket_fields = request_form_clone.ticket_fields.map(field => {
+            // Only custom ticket fields have names like request[custom_fields][ID]
+            const match = field.name && field.name.match(/[\[](\d+)[\]]$/);
+            if (!match) return field;
+
+            const fieldId = match[1];
+            if (dropdownValueMap[fieldId] !== undefined) {
+                return { ...field, value: dropdownValueMap[fieldId] };
+            }
+            return field;
+        });
+        return request_form_clone;
+    }
+
+
     //Call to function
     request_form_clone = applyTagBasedOptionFilter(request_form_clone, userTags, remove_options_by_tag);
     request_form_clone = applySubjectTextChange(request_form_clone, subjectTextByFormId);
     request_form_clone = applyCustomFieldDescriptionById(request_form_clone, customFieldDescriptionById);
+    request_form_clone = applyCustomFieldTextValue(request_form_clone, customFieldTextValue);
+    request_form_clone = applyCustomFieldDropdownValue(request_form_clone, customFieldDropdownValue);
 
     //--------------------
     //Render the form
@@ -165,8 +214,10 @@
 
     renderNewRequestForm(settings, props, container);
 
-    //Use Case 4: Hide the ticket form selector (ticket_form_field) from the DOM.
+    //Hide the ticket form selector (ticket_form_field) from the DOM.
     //This field is not part of ticket_fields, so it must be hidden via DOM after render.
+
+    /* DISABLED
     const formSelectorObserver = new MutationObserver((mutations, obs) => {
         const formSelectorField = container.querySelector('[data-garden-id="dropdowns.combobox.field"]');
         if (formSelectorField) {
@@ -174,11 +225,13 @@
             obs.disconnect();
         }
     });
-    formSelectorObserver.observe(container, { childList: true, subtree: true });
+    formSelectorObserver.observe(container, { childList: true, subtree: true });*/
 
-    //Use Case 5: Hide a custom ticket field from the DOM.
+    //Hide a custom ticket field from the DOM.
     //Custom fields render a hidden input with name="request[custom_fields][FIELD_ID]".
     //We find that input in the DOM and hide its closest field wrapper.
+
+    /* DISABLED
     const customFieldObserver = new MutationObserver((mutations, obs) => {
         const fieldInput = container.querySelector(
             `input[name="request[custom_fields][${tipo_solicitud_field_id}]"]`
@@ -189,7 +242,98 @@
             obs.disconnect();
         }
     });
-    customFieldObserver.observe(container, { childList: true, subtree: true });
+    customFieldObserver.observe(container, { childList: true, subtree: true }); */
+
+    //Block ticket submission if a required attachment is missing,
+    //based on the value of a specific dropdown field.
+    //
+    //How it works:
+    //  - A MutationObserver waits for the Submit button to appear in the DOM.
+    //  - A click listener (capture phase) intercepts the click BEFORE the form processes it.
+    //  - It reads the hidden input for the trigger field to get the currently selected value.
+    //  - It checks if any file has been attached (Zendesk adds hidden inputs for each upload).
+    //  - If the rule applies and no file is found, it cancels the submission and shows a message.
+    //
+    //Configuration: add as many rules as needed to the array below.
+
+    const attachmentRequiredRules = [
+        {
+            fieldId: tipo_caso_field_id,          // ID of the dropdown field to evaluate
+            triggerValues: ['acceso_a_cuenta'],    // Value(s) that require an attachment
+            alertMessage: 'Debes adjuntar un archivo antes de enviar el formulario para este tipo de caso.',
+        },
+        // Add more rules here if needed:
+        // {
+        //     fieldId: 'ANOTHER_FIELD_ID',
+        //     triggerValues: ['some_value', 'another_value'],
+        //     alertMessage: 'xx',
+        // },
+    ];
+
+    function applyAttachmentValidation(container, rules) {
+
+        // Helper: show or remove an inline error message near the submit button
+        function showAttachmentError(form, message) {
+            const existingError = form.querySelector('#attachment-required-error');
+            if (existingError) return; // already showing
+            const errorEl = document.createElement('p');
+            errorEl.id = 'attachment-required-error';
+            errorEl.style.cssText = 'color:#c72a1c; font-weight:600; margin-top:8px;';
+            errorEl.textContent = message;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.insertAdjacentElement('afterend', errorEl);
+        }
+
+        function clearAttachmentError(form) {
+            const el = form.querySelector('#attachment-required-error');
+            if (el) el.remove();
+        }
+
+        const submitObserver = new MutationObserver(() => {
+            const submitBtn = container.querySelector('button[type="submit"]');
+            if (!submitBtn) return;
+
+            submitObserver.disconnect(); // Found it — stop observing
+
+            submitBtn.addEventListener('click', function (e) {
+                const form = container.querySelector('form');
+                if (!form) return;
+
+                // Check every rule
+                for (const rule of rules) {
+                    // Read the hidden input that holds the current dropdown value
+                    const triggerInput = form.querySelector(
+                        `input[name="request[custom_fields][${rule.fieldId}]"]`
+                    );
+                    if (!triggerInput) continue;
+
+                    const currentValue = triggerInput.value;
+                    if (!rule.triggerValues.includes(currentValue)) {
+                        clearAttachmentError(form);
+                        continue; // Rule does not apply for this value → skip
+                    }
+
+                    // Check if at least one file has been attached.
+                    // Zendesk renders a hidden input per uploaded token: name="request[attachments][]"
+                    const attachments = form.querySelectorAll('input[name="request[attachments][]"]');
+                    const hasAttachment = attachments.length > 0;
+
+                    if (!hasAttachment) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        showAttachmentError(form, rule.alertMessage);
+                        return; // Stop checking further rules
+                    }
+
+                    clearAttachmentError(form);
+                }
+            }, true); // capture: true → intercepts before the form's own handler
+        });
+
+        submitObserver.observe(container, { childList: true, subtree: true });
+    }
+
+    applyAttachmentValidation(container, attachmentRequiredRules);
 
 
 </script>
