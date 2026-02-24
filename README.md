@@ -1,140 +1,133 @@
 # new_request_page.hbs
 
-A customized Zendesk Help Center template for the **New Request (ticket submission) page**. Built on top of the standard Zendesk `new-request-form` component, this template extends default behavior with tag-based field filtering and form-specific subject text injection.
+A customized Zendesk Help Center template for the **New Request (ticket submission) page**. Built on top of the standard Zendesk `new-request-form` module, this template adds client-side logic to control form behavior based on user tags, ticket form IDs, and field values — without requiring backend changes.
 
-
-
----
-
-## Overview
-
-This Handlebars (`.hbs`) template replaces the default Zendesk new request page. It renders the standard ticket submission form while applying two custom use cases before rendering:
-
-1. **Tag-Based Dropdown Filtering** — Hides specific dropdown options from ticket fields based on the current user's tags.
-2. **Form-Specific Subject Text** — Pre-fills the subject field with custom text depending on which ticket form is active.
-3. **Hide form selector**
-4. **Hide specific ticket custom field**
-5. **Change custom field description**
-6. More uses cases are coming.
-
+Created by **Pablo Zarricueta** — CX Consultant.
 
 ---
 
-## Requirements
+## Features
 
-- Zendesk Guide (Help Center) with a customizable theme
-- The built-in `new-request-form` ES module provided by Zendesk
-
----
-
-## Template Structure
-
-### JavaScript (ES Module)
-
-The `<script type="module">` block handles all custom logic before the form renders.
-
-#### Data Sources
-
-| Variable | Description |
-|---|---|
-| `window.HelpCenter.user.organizations` | List of organizations the current user belongs to |
-| `window.HelpCenter.user.tags` | Tags assigned to the current user |
-| `new_request_form` | Zendesk Handlebars object containing ticket fields, form info, etc. |
-| `settings` | Custom theme settings from `manifest.json` |
+- **Tag-based dropdown filtering** — Removes specific dropdown options from ticket fields depending on the logged-in user's tags.
+- **Dynamic subject text** — Pre-fills or overrides the subject field based on the active ticket form ID.
+- **Custom field descriptions** — Overrides the hint/helper text of specific custom fields at render time.
+- **Custom field pre-fill (text)** — Sets a default text value for one or more custom text fields.
+- **Custom field pre-fill (dropdown)** — Sets a default selected value for one or more custom dropdown fields.
+- **Attachment validation** — Blocks form submission and shows an inline error if a required attachment is missing for certain dropdown values.
+- **DDOM-hiding utilities** — Observers for hiding the ticket form selector and specific custom fields via the DOM (available for use when needed).
 
 ---
 
-## Use Cases
+## Configuration
 
-### Use Case 1: Hide Dropdown Options by User Tag
+All customization is done by editing the constants near the top of the `<script>` block.
 
-**Function:** `applyTagBasedOptionFilter(request_form_clone, userTags, rulesByTag)`
+### Field IDs
 
-Removes specific options from a dropdown ticket field if the current user has a matching tag.
+```js
+const tipo_caso_field_id      = '46560480244884'; // First dropdown field
+const tipo_solicitud_field_id = '39445201654164'; // Second dropdown field
+const numero_orden_field_id   = '39445254638612'; // Text field
+```
 
-**Configuration object (`remove_options_by_tag`):**
+Replace these values with your own Zendesk custom ticket field IDs.
+
+---
+
+### Tag-Based Option Filtering (`remove_options_by_tag`)
+
+Removes dropdown options from a field when the user has a specific tag.
 
 ```js
 const remove_options_by_tag = {
     'user_tag': {
-        fieldId: '46560480244884',  // Target ticket field ID
-        options: ['Duda']           // Option label(s) to remove
+        fieldId: tipo_caso_field_id,
+        options: ['Duda']  // Option label(s) to remove
     }
 };
 ```
 
-To add more rules, extend the object with additional tag keys. Each tag can map to a single rule object or an array of rule objects.
+Multiple rules can be added by uncommenting and extending the object.
 
 ---
 
-### Use Case 2: Pre-fill Subject by Ticket Form ID
+### Subject Text by Form ID (`subjectTextByFormId`)
 
-**Function:** `applySubjectTextChange(request_form_clone, subjectTextByFormId)`
-
-Automatically sets the value of the `request[subject]` field when a specific ticket form is loaded.
-
-**Configuration object (`subjectTextByFormId`):**
+Pre-fills the subject field when a specific ticket form is active.
 
 ```js
 const subjectTextByFormId = {
-    '46560545585812': 'Estas en el formulario de Demo Plantilla',
+    '46560545585812': 'Demo Custom text',
 };
 ```
 
-Add additional form ID / subject text pairs as needed.
+---
+
+### Custom Field Descriptions (`customFieldDescriptionById`)
+
+Overrides the helper/hint text shown below a field.
+
+```js
+const customFieldDescriptionById = {
+    '46560480244884': 'Description set by code',
+};
+```
 
 ---
 
-## Customization
+### Custom Text Field Values (`customFieldTextValue`)
 
-### Changing the Target Field ID
-
-Update `tipo_caso_field_id` with the ID of your custom ticket field:
+Pre-fills a text field with a specific value.
 
 ```js
-const tipo_caso_field_id = 'YOUR_FIELD_ID_HERE';
+const customFieldTextValue = {
+    '39445254638612': 'Custom text value',
+};
 ```
 
-### Adding More Tag Rules
+---
+
+### Custom Dropdown Field Values (`customFieldDropdownValue`)
+
+Pre-selects a dropdown value for a field.
 
 ```js
-const remove_options_by_tag = {
-    'tag_one': {
-        fieldId: 'FIELD_ID',
-        options: ['Option A', 'Option B']
+const customFieldDropdownValue = {
+    '46560480244884': 'demo_reclamo',
+    '39445201654164': 'acceso_a_cuenta',
+};
+```
+
+---
+
+### Attachment Validation (`attachmentRequiredRules`)
+
+Blocks form submission if no file is attached when a specific dropdown value is selected.
+
+```js
+const attachmentRequiredRules = [
+    {
+        fieldId: tipo_caso_field_id,
+        triggerValues: ['acceso_a_cuenta'],
+        alertMessage: 'Debes adjuntar un archivo antes de enviar el formulario para este tipo de caso.',
     },
-    'tag_two': [
-        { fieldId: 'FIELD_ID_1', options: ['Option C'] },
-        { fieldId: 'FIELD_ID_2', options: ['Option D'] }
-    ]
-};
+];
 ```
 
-### Adding More Subject Overrides
-
-```js
-const subjectTextByFormId = {
-    'FORM_ID_1': 'Subject text for form 1',
-    'FORM_ID_2': 'Subject text for form 2',
-};
-```
+Multiple rules can be added to the array. Each rule defines which field, which value(s) trigger the requirement, and what error message to display.
 
 ---
 
-## Debugging
+## How It Works
 
-The following values are logged to the browser console on page load to assist with development:
-
-- `userTags` — tags on the current user
-- `orgs` — organizations the user belongs to
-- `request_form_clone` — full form object before modification
-- `request_form_clone.ticket_form_field.value` — the active ticket form ID
-
-Remove or guard these `console.log` calls before deploying to production.
+1. On page load, the script clones the `new_request_form` object provided by Zendesk.
+2. Each transformation function (`applyTagBasedOptionFilter`, `applySubjectTextChange`, etc.) receives the clone and returns a modified version.
+3. The modified clone is passed to `renderNewRequestForm()`, which renders the form into `#new-request-form`.
+4. After render, a `MutationObserver` waits for the submit button to appear, then attaches a capture-phase click listener to enforce attachment validation before the form submits.
 
 ---
 
 ## References
 
-- [Zendesk Help Center Templates – new_request_page](https://developer.zendesk.com/api-reference/help_center/help-center-templates/new_request_page/)
-- [Customizing the Settings panel (manifest.json)](https://support.zendesk.com/hc/en-us/articles/4408846524954)
+- [Zendesk New Request Page Template Docs](https://developer.zendesk.com/api-reference/help_center/help-center-templates/new_request_page/)
+- [Zendesk Theme manifest.json / Settings](https://support.zendesk.com/hc/en-us/articles/4408846524954)
